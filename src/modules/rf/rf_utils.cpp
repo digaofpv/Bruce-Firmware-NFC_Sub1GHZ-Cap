@@ -414,6 +414,24 @@ void setMHZ(float frequency) {
             vTaskDelay(10 / portTICK_PERIOD_MS); // time to settle the antenna signal
         }
 #endif
+#if defined(ARDUINO_M5STACK_CARDPUTER)
+        // M5Stack Cap CC1101 (U219) band switch
+        //   315 MHz: SW0=0 SW1=0 | 433 MHz: SW0=0 SW1=1 | 868/915 MHz: SW0=1 SW1=1
+        // SW0 = G13 (ESP32). SW1 = CC1101 GDO2, forced via IOCFG2:
+        //   0x2F = constant LOW, 0x6F = constant HIGH (GDOx_INV set).
+        // Must run on every call: ELECHOUSE Init() rewrites IOCFG2 as a data output.
+        {
+            static int8_t capBand = -1; // 0=315, 1=433, 2=868/915
+            const int8_t band = frequency > 500 ? 2 : (frequency > 350 ? 1 : 0);
+            pinMode(13, OUTPUT);
+            digitalWrite(13, band == 2 ? HIGH : LOW);
+            ELECHOUSE_cc1101.SpiWriteReg(CC1101_IOCFG2, band >= 1 ? 0x6F : 0x2F);
+            if (band != capBand) {
+                capBand = band;
+                vTaskDelay(10 / portTICK_PERIOD_MS); // let the RF switch settle
+            }
+        }
+#endif
         const bool preciseCalibration = (bruceConfigPins.rfFxdFreq);
         const uint8_t previousMode = preciseCalibration ? ELECHOUSE_cc1101.getMode() : 0;
         const uint8_t targetMode =
