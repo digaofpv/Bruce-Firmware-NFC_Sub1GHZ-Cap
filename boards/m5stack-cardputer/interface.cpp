@@ -136,21 +136,38 @@ void _post_setup_gpio() {
     bruceConfigPins.CC1101_bus.sck = (gpio_num_t)40;
     bruceConfigPins.CC1101_bus.miso = (gpio_num_t)39;
     bruceConfigPins.CC1101_bus.mosi = (gpio_num_t)14;
-    bruceConfigPins.CC1101_bus.cs = (gpio_num_t)13;
-    bruceConfigPins.CC1101_bus.io0 = (gpio_num_t)5;
+    // M5Stack Cap CC1101 (U219): CS=G5, GDO0=G15 (G13 = RF_SW0, band switch)
+    bruceConfigPins.CC1101_bus.cs = (gpio_num_t)5;
+    bruceConfigPins.CC1101_bus.io0 = (gpio_num_t)15;
+    bruceConfigPins.CC1101_bus.io2 = GPIO_NUM_NC; // GDO2 drives RF_SW1, never a data pin
 
     bruceConfigPins.NRF24_bus.sck = (gpio_num_t)40;
     bruceConfigPins.NRF24_bus.miso = (gpio_num_t)39;
     bruceConfigPins.NRF24_bus.mosi = (gpio_num_t)14;
-    bruceConfigPins.NRF24_bus.cs = (gpio_num_t)6;
-    bruceConfigPins.NRF24_bus.io0 = (gpio_num_t)4;
+    // Cap CC1101 has no NRF24; G6/G4 belong to the ST25R3916 NFC chip
+    bruceConfigPins.NRF24_bus.cs = GPIO_NUM_NC;
+    bruceConfigPins.NRF24_bus.io0 = GPIO_NUM_NC;
 
-    pinMode(bruceConfigPins.NRF24_bus.cs, OUTPUT);
+    // ST25R3916 NFC on Cap CC1101: CS=G6, IRQ=G4, shared SPI
+    if (bruceConfigPins.ST25R_bus.cs == GPIO_NUM_NC) {
+        bruceConfigPins.ST25R_bus.sck = (gpio_num_t)40;
+        bruceConfigPins.ST25R_bus.miso = (gpio_num_t)39;
+        bruceConfigPins.ST25R_bus.mosi = (gpio_num_t)14;
+        bruceConfigPins.ST25R_bus.cs = (gpio_num_t)6;
+        bruceConfigPins.ST25R_bus.io0 = (gpio_num_t)4;
+    }
+    // G6 is NFC_CS on Cap CC1101 but LoRa BUSY (an output) on Cap LoRa-1262.
+    // A weak pull-up keeps the NFC deselected without fighting the SX1262.
+    // G13 is left untouched at boot (GPS RX on Cap LoRa-1262); the band switch
+    // is only driven by setMHZ() when the RF module is actually used.
+    pinMode(6, INPUT_PULLUP);
+
     pinMode(bruceConfigPins.CC1101_bus.cs, OUTPUT);
-    pinMode(bruceConfigPins.LoRa_bus.cs, OUTPUT);
-    digitalWrite(bruceConfigPins.NRF24_bus.cs, HIGH);
     digitalWrite(bruceConfigPins.CC1101_bus.cs, HIGH);
-    digitalWrite(bruceConfigPins.LoRa_bus.cs, HIGH);
+    if (bruceConfigPins.LoRa_bus.cs != GPIO_NUM_NC) {
+        pinMode(bruceConfigPins.LoRa_bus.cs, OUTPUT);
+        digitalWrite(bruceConfigPins.LoRa_bus.cs, HIGH);
+    }
 
     tca.matrix(7, 8);
     tca.flush();
